@@ -99,6 +99,8 @@ const INSTAGRAM = [
 
 const IG_EMBED_W = 326;
 const IG_EMBED_H = 540;
+/** Extra shrink inside each tile (never upscale past native embed size). */
+const IG_EMBED_SHRINK = 0.58;
 
 function instagramEmbedSrc(permalink: string): string {
   const clean = permalink.split("?")[0].replace(/\/$/, "");
@@ -366,6 +368,14 @@ function StickyNav({ totalItems, onCartOpen }: { totalItems: number; onCartOpen:
 
   const navText = scrolled ? TX : "#fff";
   const cartBorder = totalItems > 0 ? R : scrolled ? "#999" : "rgba(255,255,255,0.7)";
+  const headerBarH = scrolled ? 56 : 50;
+
+  const drawerBg = scrolled ? "rgba(255,255,255,0.97)" : "rgba(8,8,8,0.94)";
+  const drawerBorder = scrolled ? `1px solid ${DV}` : "1px solid rgba(255,255,255,0.14)";
+  const drawerLinkColor = scrolled ? TX : "rgba(255,255,255,0.92)";
+  const drawerDivider = scrolled ? DV : "rgba(255,255,255,0.12)";
+  const drawerMuted = scrolled ? MU : "rgba(255,255,255,0.45)";
+  const backdropTint = scrolled ? "rgba(0,0,0,0.4)" : "rgba(0,0,0,0.55)";
 
   return (
     <div style={{
@@ -373,13 +383,13 @@ function StickyNav({ totalItems, onCartOpen }: { totalItems: number; onCartOpen:
       background: scrolled ? "rgba(255,255,255,0.97)" : "rgba(0,0,0,0.55)",
       backdropFilter: "blur(10px)",
       borderBottom: scrolled ? `1px solid ${DV}` : "none",
-      transition: "all 0.35s ease",
+      transition: "background 0.35s ease, border-color 0.35s ease",
     }}>
       {scrolled && <div style={{ background: CHECKER, backgroundSize: "14px 14px", height: 6 }} />}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
         padding: "0 clamp(12px,4vw,80px)", minHeight: 50, boxSizing: "border-box",
-        position: "relative", zIndex: 102,
+        position: "relative", zIndex: 104,
       }}>
         <span style={{
           fontFamily: "'Bebas Neue',sans-serif",
@@ -484,35 +494,90 @@ function StickyNav({ totalItems, onCartOpen }: { totalItems: number; onCartOpen:
         )}
       </div>
 
-      {isMobileNav && menuOpen && (
-        <div
-          style={{
-            position: "fixed", top: scrolled ? 56 : 50, left: 0, right: 0, bottom: 0,
-            background: "rgba(255,255,255,0.98)", zIndex: 101,
-            padding: "12px clamp(12px,4vw,24px) 24px",
-            paddingBottom: "max(24px, env(safe-area-inset-bottom))",
-            overflowY: "auto",
-            borderTop: `1px solid ${DV}`,
-            boxSizing: "border-box",
-          }}
-        >
-          {NAV_LINKS.map(([id, label]) => (
+      {isMobileNav && (
+        <>
+          <div
+            aria-hidden
+            onClick={() => setMenuOpen(false)}
+            style={{
+              position: "fixed", inset: 0, zIndex: 101,
+              background: backdropTint,
+              opacity: menuOpen ? 1 : 0,
+              pointerEvents: menuOpen ? "auto" : "none",
+              transition: "opacity 0.32s ease, background 0.35s ease",
+            }}
+          />
+          <aside
+            aria-hidden={!menuOpen}
+            style={{
+              position: "fixed", top: 0, right: 0, bottom: 0,
+              width: "min(92vw, 300px)",
+              zIndex: 103,
+              background: drawerBg,
+              backdropFilter: "blur(18px)",
+              WebkitBackdropFilter: "blur(18px)",
+              borderLeft: drawerBorder,
+              boxShadow: scrolled
+                ? "-12px 0 40px rgba(0,0,0,0.08)"
+                : "-16px 0 48px rgba(0,0,0,0.45)",
+              transform: menuOpen ? "translateX(0)" : "translateX(100%)",
+              transition: "transform 0.34s cubic-bezier(0.22, 1, 0.36, 1), background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease",
+              pointerEvents: menuOpen ? "auto" : "none",
+              display: "flex", flexDirection: "column",
+              paddingTop: `calc(${headerBarH}px + env(safe-area-inset-top, 0px) + 8px)`,
+              paddingLeft: 20,
+              paddingRight: 20,
+              paddingBottom: "max(28px, env(safe-area-inset-bottom))",
+              boxSizing: "border-box",
+            }}
+          >
+            <p style={{
+              fontFamily: "'Bebas Neue',sans-serif", fontSize: 11, letterSpacing: "0.28em",
+              color: drawerMuted, marginBottom: 20, marginTop: 0,
+            }}>
+              NAVIGATE
+            </p>
+            <nav style={{ display: "flex", flexDirection: "column", gap: 0, flex: 1 }}>
+              {NAV_LINKS.map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => scrollTo(id)}
+                  style={{
+                    display: "block", width: "100%", textAlign: "left",
+                    padding: "18px 6px", border: "none",
+                    borderBottom: `1px solid ${drawerDivider}`,
+                    background: "transparent", color: drawerLinkColor,
+                    fontFamily: "'Bebas Neue',sans-serif", fontSize: 20,
+                    letterSpacing: "0.18em", cursor: "pointer",
+                    WebkitTapHighlightColor: "transparent",
+                    transition: "color 0.2s ease",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </nav>
             <button
-              key={id}
               type="button"
-              onClick={() => scrollTo(id)}
+              onClick={openCart}
               style={{
-                display: "block", width: "100%", textAlign: "left",
-                padding: "16px 4px", border: "none", borderBottom: `1px solid ${DV}`,
-                background: "transparent", color: TX,
-                fontFamily: "'Bebas Neue',sans-serif", fontSize: 18,
-                letterSpacing: "0.2em", cursor: "pointer",
+                marginTop: 20,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                width: "100%", padding: "14px 16px", boxSizing: "border-box",
+                background: totalItems > 0 ? R : scrolled ? TX : "rgba(255,255,255,0.12)",
+                color: totalItems > 0 || !scrolled ? "#fff" : WH,
+                border: totalItems > 0 ? "none" : scrolled ? "none" : "1px solid rgba(255,255,255,0.2)",
+                fontFamily: "'Bebas Neue',sans-serif", fontSize: 14,
+                letterSpacing: "0.16em", cursor: "pointer",
+                WebkitTapHighlightColor: "transparent",
               }}
             >
-              {label}
+              <ShoppingCart size={16} />
+              {totalItems > 0 ? `ORDER · ${totalItems}` : "VIEW ORDER"}
             </button>
-          ))}
-        </div>
+          </aside>
+        </>
       )}
     </div>
   );
@@ -918,7 +983,10 @@ function InstagramSection() {
           VIEW ALL <ExternalLink size={11} />
         </a>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 4, width: "100%", minWidth: 0 }}>
+      <div style={{
+        display: "grid", gridTemplateColumns: gridCols, gap: 8,
+        width: "100%", maxWidth: "min(100%, 840px)", margin: "0 auto", minWidth: 0,
+      }}>
         {INSTAGRAM.map((href) => (
           <InstaCell key={href} href={href} />
         ))}
@@ -943,7 +1011,8 @@ function InstaCell({ href }: { href: string }) {
     return () => ro.disconnect();
   }, []);
 
-  const scale = cellW / IG_EMBED_W;
+  const fitScale = Math.min(cellW / IG_EMBED_W, 1);
+  const scale = fitScale * IG_EMBED_SHRINK;
   const [hov, setHov] = useState(false);
 
   return (
@@ -969,12 +1038,12 @@ function InstaCell({ href }: { href: string }) {
         allow="clipboard-write; encrypted-media; picture-in-picture; web-share"
         style={{
           position: "absolute",
-          top: 0,
+          top: "50%",
           left: "50%",
           width: IG_EMBED_W,
           height: IG_EMBED_H,
-          transform: `translateX(-50%) scale(${scale})`,
-          transformOrigin: "top center",
+          transform: `translate(-50%, -50%) scale(${scale})`,
+          transformOrigin: "center center",
           border: 0,
         }}
       />
