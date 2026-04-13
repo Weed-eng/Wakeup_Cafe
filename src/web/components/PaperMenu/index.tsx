@@ -88,12 +88,12 @@ const EVENTS = [
 ];
 
 const INSTAGRAM = [
-  { img: "/social-1.png", caption: "friday night done right 🖤" },
-  { img: "/social-2.png", caption: "the smash burger > everything" },
-  { img: "/social-3.png", caption: "fries gone wild. literally." },
-  { img: "/social-4.png", caption: "2am and the vibes are immaculate" },
-  { img: "/social-5.png", caption: "cross section hit different" },
-  { img: "/social-6.png", caption: "shake szn is forever" },
+  { img: "/social-1.png", caption: "friday night done right 🖤", href: "https://www.instagram.com/reel/DOOSbMwAkvn/" },
+  { img: "/social-2.png", caption: "the smash burger > everything", href: "https://www.instagram.com/p/DQreEMEAoyt/" },
+  { img: "/social-3.png", caption: "fries gone wild. literally.", href: "https://www.instagram.com/reel/DRIESq5DVdl/" },
+  { img: "/social-4.png", caption: "2am and the vibes are immaculate", href: "https://www.instagram.com/reel/DVUT1wXgpA_/" },
+  { img: "/social-5.png", caption: "cross section hit different", href: "https://www.instagram.com/reel/DTOQpVgiBve/" },
+  { img: "/social-6.png", caption: "shake szn is forever", href: "https://www.instagram.com/reel/DUsKQnJDVvT/" },
 ];
 
 const CHECKER = `repeating-conic-gradient(${CB1} 0% 25%, ${CB2} 0% 50%)`;
@@ -762,7 +762,7 @@ function InstagramSection() {
     <div id="instagram" style={{ scrollMarginTop: 80 }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
         <SectionHeading>@wakeupcafe</SectionHeading>
-        <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" style={{
+        <a href="https://www.instagram.com/wakeupcafe/" target="_blank" rel="noopener noreferrer" style={{
           display: "flex", alignItems: "center", gap: 6,
           fontFamily: "'Bebas Neue',sans-serif", fontSize: 12, letterSpacing: "0.18em",
           color: R, textDecoration: "none",
@@ -777,13 +777,19 @@ function InstagramSection() {
   );
 }
 
-function InstaCell({ post }: { post: { img: string; caption: string } }) {
+function InstaCell({ post }: { post: { img: string; caption: string; href: string } }) {
   const [hov, setHov] = useState(false);
   return (
-    <div
+    <a
+      href={post.href}
+      target="_blank"
+      rel="noopener noreferrer"
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
-      style={{ position: "relative", aspectRatio: "1", overflow: "hidden", cursor: "pointer" }}
+      style={{
+        position: "relative", aspectRatio: "1", overflow: "hidden", cursor: "pointer",
+        display: "block", textDecoration: "none", color: "inherit",
+      }}
     >
       <img src={post.img} alt="" style={{
         width: "100%", height: "100%", objectFit: "cover", display: "block",
@@ -803,7 +809,7 @@ function InstaCell({ post }: { post: { img: string; caption: string } }) {
         boxShadow: hov ? `inset 0 0 0 2px ${R}` : "none",
         transition: "box-shadow 0.2s",
       }} />
-    </div>
+    </a>
   );
 }
 
