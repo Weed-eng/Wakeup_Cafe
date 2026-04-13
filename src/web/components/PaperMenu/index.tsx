@@ -1179,7 +1179,7 @@ function CartDrawer({ open, onClose, cart, onAdd, onRemove, totalPKR }: {
             style={{
               position: "fixed", top: 0, right: 0, bottom: 0, zIndex: 201,
               width: "clamp(280px,85vw,420px)",
-              background: WH, borderLeft: `2px solid ${R}`,
+              background: CHECKER, borderLeft: `2px solid ${R}`,
               boxShadow: "-4px 0 30px rgba(0,0,0,0.12)",
               display: "flex", flexDirection: "column", overflow: "hidden",
             }}
