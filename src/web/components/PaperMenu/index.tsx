@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MapPin, Clock, Phone, ExternalLink, ShoppingCart, Plus, ChevronDown } from "lucide-react";
+import { MapPin, Clock, Phone, ExternalLink, ShoppingCart, Plus, ChevronDown, Menu, X } from "lucide-react";
 
 /* ── light theme palette ── */
 const R   = "#cc0000";   // red
@@ -87,18 +87,52 @@ const EVENTS = [
   { date: "FRI 25 APR", title: "Live Jazz",         desc: "Smooth jazz, late-night fries, neon lights." },
 ];
 
+/** Permalinks — previews use Instagram’s /embed iframe (real post media). */
 const INSTAGRAM = [
-  { img: "/social-1.png", caption: "friday night done right 🖤", href: "https://www.instagram.com/reel/DOOSbMwAkvn/" },
-  { img: "/social-2.png", caption: "the smash burger > everything", href: "https://www.instagram.com/p/DQreEMEAoyt/" },
-  { img: "/social-3.png", caption: "fries gone wild. literally.", href: "https://www.instagram.com/reel/DRIESq5DVdl/" },
-  { img: "/social-4.png", caption: "2am and the vibes are immaculate", href: "https://www.instagram.com/reel/DVUT1wXgpA_/" },
-  { img: "/social-5.png", caption: "cross section hit different", href: "https://www.instagram.com/reel/DTOQpVgiBve/" },
-  { img: "/social-6.png", caption: "shake szn is forever", href: "https://www.instagram.com/reel/DUsKQnJDVvT/" },
-];
+  "https://www.instagram.com/reel/DOOSbMwAkvn/",
+  "https://www.instagram.com/p/DQreEMEAoyt/",
+  "https://www.instagram.com/reel/DRIESq5DVdl/",
+  "https://www.instagram.com/reel/DVUT1wXgpA_/",
+  "https://www.instagram.com/reel/DTOQpVgiBve/",
+  "https://www.instagram.com/reel/DUsKQnJDVvT/",
+] as const;
+
+const IG_EMBED_W = 326;
+const IG_EMBED_H = 540;
+
+function instagramEmbedSrc(permalink: string): string {
+  const clean = permalink.split("?")[0].replace(/\/$/, "");
+  return `${clean}/embed`;
+}
 
 const CHECKER = `repeating-conic-gradient(${CB1} 0% 25%, ${CB2} 0% 50%)`;
 
 interface CartEntry { name: string; price: number | string; qty: number; }
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const fn = () => setMatches(mq.matches);
+    fn();
+    mq.addEventListener("change", fn);
+    return () => mq.removeEventListener("change", fn);
+  }, [query]);
+  return matches;
+}
+
+/** True for mouse/trackpad desktops — false for most phones/tablets (touch). */
+function usePrefersFinePointer(): boolean {
+  const [ok, setOk] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(pointer: fine) and (hover: hover)");
+    const fn = () => setOk(mq.matches);
+    fn();
+    mq.addEventListener("change", fn);
+    return () => mq.removeEventListener("change", fn);
+  }, []);
+  return ok;
+}
 
 /* ══════════════════════════════════════════
    CUSTOM CURSOR
@@ -230,12 +264,15 @@ export default function PaperMenu() {
 
   const totalItems = cart.reduce((s, c) => s + c.qty, 0);
   const totalPKR   = cart.reduce((s, c) => s + (typeof c.price === "number" ? c.price * c.qty : 0), 0);
+  const finePointer = usePrefersFinePointer();
 
   return (
-    <div style={{ background: BG, minHeight: "100vh", color: TX, fontFamily: "'Barlow', sans-serif", overflowX: "hidden", cursor: "none" }}>
-      <style>{`*, *::before, *::after { cursor: none !important; }`}</style>
-
-      <CustomCursor />
+    <div style={{
+      background: BG, minHeight: "100vh", color: TX, fontFamily: "'Barlow', sans-serif",
+      overflowX: "hidden", cursor: finePointer ? "none" : "auto",
+    }}>
+      {finePointer && <style>{`*, *::before, *::after { cursor: none !important; }`}</style>}
+      {finePointer && <CustomCursor />}
 
       <StickyNav totalItems={totalItems} onCartOpen={() => setCartOpen(true)} />
 
@@ -276,7 +313,8 @@ export default function PaperMenu() {
               background: R, color: "#fff", border: "none",
               width: 58, height: 58,
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
-              boxShadow: `0 4px 20px ${R}88`, cursor: "pointer",
+              boxShadow: `0 4px 20px ${R}88`,
+              cursor: finePointer ? "none" : "pointer",
               fontFamily: "'Bebas Neue',sans-serif", fontSize: 11,
             }}
           >
@@ -292,16 +330,42 @@ export default function PaperMenu() {
 /* ══════════════════════════════════════════
    STICKY NAV
 ══════════════════════════════════════════ */
+const NAV_LINKS: [string, string][] = [["menu", "Menu"], ["events", "Events"], ["instagram", "Instagram"], ["location", "Location"]];
+
 function StickyNav({ totalItems, onCartOpen }: { totalItems: number; onCartOpen: () => void }) {
   const [scrolled, setScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const isMobileNav = useMediaQuery("(max-width: 768px)");
+
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 60);
     window.addEventListener("scroll", fn, { passive: true });
     return () => window.removeEventListener("scroll", fn);
   }, []);
 
-  const scrollTo = (id: string) =>
+  useEffect(() => {
+    if (!isMobileNav) setMenuOpen(false);
+  }, [isMobileNav]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [menuOpen]);
+
+  const scrollTo = (id: string) => {
+    setMenuOpen(false);
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const openCart = () => {
+    setMenuOpen(false);
+    onCartOpen();
+  };
+
+  const navText = scrolled ? TX : "#fff";
+  const cartBorder = totalItems > 0 ? R : scrolled ? "#999" : "rgba(255,255,255,0.7)";
 
   return (
     <div style={{
@@ -313,70 +377,143 @@ function StickyNav({ totalItems, onCartOpen }: { totalItems: number; onCartOpen:
     }}>
       {scrolled && <div style={{ background: CHECKER, backgroundSize: "14px 14px", height: 6 }} />}
       <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 clamp(20px,5vw,80px)", height: 50,
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+        padding: "0 clamp(12px,4vw,80px)", minHeight: 50, boxSizing: "border-box",
+        position: "relative", zIndex: 102,
       }}>
-        <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 24, letterSpacing: "0.08em", color: scrolled ? TX : "#fff" }}>
+        <span style={{
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: isMobileNav ? 20 : 24,
+          letterSpacing: "0.08em", color: navText, flexShrink: 0,
+        }}>
           wakeup<span style={{ color: R }}>®</span>
         </span>
 
-        <nav style={{ display: "flex", gap: 4, alignItems: "center" }}>
-          {[["menu","Menu"],["events","Events"],["instagram","Instagram"],["location","Location"]].map(([id, label]) => (
-            <button key={id} onClick={() => scrollTo(id)}
-              className="nav-desktop-link"
+        {isMobileNav ? (
+          <>
+            <div style={{ flex: 1 }} />
+            <button
+              type="button"
+              onClick={openCart}
+              aria-label={totalItems > 0 ? `Open cart, ${totalItems} items` : "Open order"}
               style={{
-                background: "none", border: "none", cursor: "pointer",
-                fontFamily: "'Bebas Neue',sans-serif", fontSize: 13,
-                letterSpacing: "0.18em", color: scrolled ? TX : "#fff",
-                padding: "5px 12px", position: "relative",
-                transition: "color 0.2s",
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "6px 12px",
+                background: totalItems > 0 ? R : "transparent",
+                border: `2px solid ${cartBorder}`,
+                color: totalItems > 0 ? "#fff" : navText,
+                fontFamily: "'Bebas Neue',sans-serif", fontSize: 11,
+                letterSpacing: "0.1em", cursor: "pointer",
+                flexShrink: 0,
               }}
+            >
+              <ShoppingCart size={14} />
+              {totalItems > 0 ? <span aria-hidden>{`(${totalItems})`}</span> : null}
+            </button>
+            <button
+              type="button"
+              aria-expanded={menuOpen}
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              onClick={() => setMenuOpen((o) => !o)}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                width: 44, height: 44, marginRight: -6,
+                background: "transparent", border: "none", color: navText, cursor: "pointer",
+              }}
+            >
+              {menuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </>
+        ) : (
+          <nav style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {NAV_LINKS.map(([id, label]) => (
+              <button key={id} type="button" onClick={() => scrollTo(id)}
+                className="nav-desktop-link"
+                style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  fontFamily: "'Bebas Neue',sans-serif", fontSize: 13,
+                  letterSpacing: "0.18em", color: navText,
+                  padding: "5px 10px", position: "relative",
+                  transition: "color 0.2s",
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.color = R;
+                  (e.currentTarget.querySelector(".nav-ul") as HTMLElement).style.transform = "scaleX(1)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.color = navText;
+                  (e.currentTarget.querySelector(".nav-ul") as HTMLElement).style.transform = "scaleX(0)";
+                }}
+              >
+                {label}
+                <span className="nav-ul" style={{
+                  position: "absolute", bottom: 0, left: "10px", right: "10px",
+                  height: "2px", background: R,
+                  transform: "scaleX(0)", transformOrigin: "left",
+                  transition: "transform 0.2s ease",
+                  display: "block",
+                }} />
+              </button>
+            ))}
+
+            <button type="button" onClick={openCart}
               onMouseEnter={e => {
-                e.currentTarget.style.color = R;
-                (e.currentTarget.querySelector(".nav-ul") as HTMLElement).style.transform = "scaleX(1)";
+                e.currentTarget.style.background = R;
+                e.currentTarget.style.color = "#fff";
+                e.currentTarget.style.borderColor = R;
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.color = scrolled ? TX : "#fff";
-                (e.currentTarget.querySelector(".nav-ul") as HTMLElement).style.transform = "scaleX(0)";
+                e.currentTarget.style.background = totalItems > 0 ? R : "transparent";
+                e.currentTarget.style.color = totalItems > 0 ? "#fff" : navText;
+                e.currentTarget.style.borderColor = totalItems > 0 ? R : cartBorder;
+              }}
+              style={{
+                display: "flex", alignItems: "center", gap: 7,
+                padding: "7px 16px",
+                background: totalItems > 0 ? R : "transparent",
+                border: `2px solid ${totalItems > 0 ? R : cartBorder}`,
+                color: totalItems > 0 ? "#fff" : navText,
+                fontFamily: "'Bebas Neue',sans-serif", fontSize: 13,
+                letterSpacing: "0.12em", cursor: "pointer",
+                transition: "all 0.18s ease",
+              }}>
+              <ShoppingCart size={13} />
+              {totalItems > 0 ? `ORDER (${totalItems})` : "ORDER"}
+            </button>
+          </nav>
+        )}
+      </div>
+
+      {isMobileNav && menuOpen && (
+        <div
+          style={{
+            position: "fixed", top: scrolled ? 56 : 50, left: 0, right: 0, bottom: 0,
+            background: "rgba(255,255,255,0.98)", zIndex: 101,
+            padding: "12px clamp(12px,4vw,24px) 24px",
+            paddingBottom: "max(24px, env(safe-area-inset-bottom))",
+            overflowY: "auto",
+            borderTop: `1px solid ${DV}`,
+            boxSizing: "border-box",
+          }}
+        >
+          {NAV_LINKS.map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => scrollTo(id)}
+              style={{
+                display: "block", width: "100%", textAlign: "left",
+                padding: "16px 4px", border: "none", borderBottom: `1px solid ${DV}`,
+                background: "transparent", color: TX,
+                fontFamily: "'Bebas Neue',sans-serif", fontSize: 18,
+                letterSpacing: "0.2em", cursor: "pointer",
               }}
             >
               {label}
-              <span className="nav-ul" style={{
-                position: "absolute", bottom: 0, left: "12px", right: "12px",
-                height: "2px", background: R,
-                transform: "scaleX(0)", transformOrigin: "left",
-                transition: "transform 0.2s ease",
-                display: "block",
-              }} />
             </button>
           ))}
-
-          <button onClick={onCartOpen}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = R;
-              e.currentTarget.style.color = "#fff";
-              e.currentTarget.style.borderColor = R;
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = totalItems > 0 ? R : "transparent";
-              e.currentTarget.style.color = totalItems > 0 ? "#fff" : scrolled ? TX : "#fff";
-              e.currentTarget.style.borderColor = totalItems > 0 ? R : scrolled ? "#ccc" : "rgba(255,255,255,0.45)";
-            }}
-            style={{
-              display: "flex", alignItems: "center", gap: 7,
-              padding: "7px 16px",
-              background: totalItems > 0 ? R : "transparent",
-              border: `2px solid ${totalItems > 0 ? R : scrolled ? "#999" : "rgba(255,255,255,0.7)"}`,
-              color: totalItems > 0 ? "#fff" : scrolled ? TX : "#fff",
-              fontFamily: "'Bebas Neue',sans-serif", fontSize: 13,
-              letterSpacing: "0.12em", cursor: "pointer",
-              transition: "all 0.18s ease",
-            }}>
-            <ShoppingCart size={13} />
-            {totalItems > 0 ? `ORDER (${totalItems})` : "ORDER"}
-          </button>
-        </nav>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -578,17 +715,25 @@ function Rule() {
 function TwoColMenu({ addItem }: { addItem: (n: string, p: number | string) => void }) {
   const left  = ["Coffee", "Burgers", "Originals", "Add Ons"];
   const right = ["Appetizers", "Funghi's Pizza", "Drinks", "Desserts"];
+  const stack = useMediaQuery("(max-width: 700px)");
 
   return (
     <div id="menu" style={{ scrollMarginTop: 80 }}>
       <p style={{ fontSize: 12, color: MU, fontStyle: "italic", marginBottom: 24 }}>
         let the servers know for any kind of allergy · current GST rate will be applied
       </p>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1px 1fr", gap: "0 clamp(24px,4vw,56px)", alignItems: "start" }}>
-        <div>{left.map(c => <MenuCat key={c} name={c} items={MENU_DATA[c]} addItem={addItem} />)}</div>
-        <div style={{ background: DV, alignSelf: "stretch" }} />
-        <div>{right.map(c => <MenuCat key={c} name={c} items={MENU_DATA[c]} addItem={addItem} />)}</div>
-      </div>
+      {stack ? (
+        <div style={{ width: "100%", minWidth: 0 }}>
+          {left.map(c => <MenuCat key={c} name={c} items={MENU_DATA[c]} addItem={addItem} />)}
+          {right.map(c => <MenuCat key={c} name={c} items={MENU_DATA[c]} addItem={addItem} />)}
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1px 1fr", gap: "0 clamp(24px,4vw,56px)", alignItems: "start" }}>
+          <div>{left.map(c => <MenuCat key={c} name={c} items={MENU_DATA[c]} addItem={addItem} />)}</div>
+          <div style={{ background: DV, alignSelf: "stretch" }} />
+          <div>{right.map(c => <MenuCat key={c} name={c} items={MENU_DATA[c]} addItem={addItem} />)}</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -736,7 +881,7 @@ function EventsSection() {
   return (
     <div id="events" style={{ scrollMarginTop: 80 }}>
       <SectionHeading>What's on</SectionHeading>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 200px), 1fr))", gap: 12, width: "100%", minWidth: 0 }}>
         {EVENTS.map(ev => (
           <div key={ev.title} style={{
             background: WH, border: `1px solid ${DV}`,
@@ -758,8 +903,11 @@ function EventsSection() {
    INSTAGRAM
 ══════════════════════════════════════════ */
 function InstagramSection() {
+  const narrow = useMediaQuery("(max-width: 640px)");
+  const single = useMediaQuery("(max-width: 400px)");
+  const gridCols = single ? "minmax(0,1fr)" : narrow ? "repeat(2, minmax(0,1fr))" : "repeat(3, minmax(0,1fr))";
   return (
-    <div id="instagram" style={{ scrollMarginTop: 80 }}>
+    <div id="instagram" style={{ scrollMarginTop: 80, width: "100%", minWidth: 0 }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
         <SectionHeading>@wakeupcafe</SectionHeading>
         <a href="https://www.instagram.com/wakeupcafe/" target="_blank" rel="noopener noreferrer" style={{
@@ -770,46 +918,67 @@ function InstagramSection() {
           VIEW ALL <ExternalLink size={11} />
         </a>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 4 }}>
-        {INSTAGRAM.map((p, i) => <InstaCell key={i} post={p} />)}
+      <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 4, width: "100%", minWidth: 0 }}>
+        {INSTAGRAM.map((href) => (
+          <InstaCell key={href} href={href} />
+        ))}
       </div>
     </div>
   );
 }
 
-function InstaCell({ post }: { post: { img: string; caption: string; href: string } }) {
+function InstaCell({ href }: { href: string }) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [cellW, setCellW] = useState(280);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width;
+      if (w && w > 0) setCellW(w);
+    });
+    ro.observe(el);
+    setCellW(el.offsetWidth || 280);
+    return () => ro.disconnect();
+  }, []);
+
+  const scale = cellW / IG_EMBED_W;
   const [hov, setHov] = useState(false);
+
   return (
-    <a
-      href={post.href}
-      target="_blank"
-      rel="noopener noreferrer"
+    <div
+      ref={wrapRef}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
-        position: "relative", aspectRatio: "1", overflow: "hidden", cursor: "pointer",
-        display: "block", textDecoration: "none", color: "inherit",
-      }}
-    >
-      <img src={post.img} alt="" style={{
-        width: "100%", height: "100%", objectFit: "cover", display: "block",
-        transform: hov ? "scale(1.06)" : "scale(1)",
-        transition: "transform 0.4s ease",
-      }} />
-      <div style={{
-        position: "absolute", inset: 0,
-        background: "rgba(0,0,0,0.5)",
-        display: "flex", alignItems: "flex-end", padding: 10,
-        opacity: hov ? 1 : 0, transition: "opacity 0.3s",
-      }}>
-        <p style={{ fontFamily: "'Barlow',sans-serif", fontSize: 11, color: "#fff", lineHeight: 1.4 }}>{post.caption}</p>
-      </div>
-      <div style={{
-        position: "absolute", inset: 0, pointerEvents: "none",
+        position: "relative",
+        width: "100%",
+        aspectRatio: "1",
+        overflow: "hidden",
+        background: "#0a0a0a",
         boxShadow: hov ? `inset 0 0 0 2px ${R}` : "none",
         transition: "box-shadow 0.2s",
-      }} />
-    </a>
+      }}
+    >
+      <iframe
+        title="Instagram post"
+        src={instagramEmbedSrc(href)}
+        loading="lazy"
+        referrerPolicy="strict-origin-when-cross-origin"
+        allow="clipboard-write; encrypted-media; picture-in-picture; web-share"
+        style={{
+          position: "absolute",
+          top: 0,
+          left: "50%",
+          width: IG_EMBED_W,
+          height: IG_EMBED_H,
+          transform: `translateX(-50%) scale(${scale})`,
+          transformOrigin: "top center",
+          border: 0,
+        }}
+      />
+    </div>
   );
 }
 
@@ -817,36 +986,48 @@ function InstaCell({ post }: { post: { img: string; caption: string; href: strin
    LOCATION
 ══════════════════════════════════════════ */
 function LocationSection() {
+  const narrow = useMediaQuery("(max-width: 640px)");
   return (
-    <div id="location" style={{ scrollMarginTop: 80 }}>
+    <div id="location" style={{ scrollMarginTop: 80, width: "100%", minWidth: 0, boxSizing: "border-box" }}>
       <SectionHeading>Find us</SectionHeading>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 28, alignItems: "start" }}>
-        <div style={{ border: `1px solid ${DV}`, overflow: "hidden", height: 280 }}>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: narrow ? "minmax(0, 1fr)" : "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
+        gap: 28,
+        alignItems: "start",
+        width: "100%",
+        minWidth: 0,
+      }}>
+        <div style={{
+          border: `1px solid ${DV}`, overflow: "hidden", height: narrow ? 220 : 280,
+          minWidth: 0, width: "100%", maxWidth: "100%", boxSizing: "border-box",
+        }}>
           <iframe
             src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3322.9063095!2d73.0844!3d33.6844!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x38df95b5e0c2e9e9%3A0x0!2sI-8+Markaz%2C+Islamabad!5e0!3m2!1sen!2s!4v1700000000000!5m2!1sen!2s"
-            width="100%" height="100%" style={{ border: 0 }}
+            width="100%" height="100%" style={{ border: 0, display: "block", maxWidth: "100%" }}
             allowFullScreen loading="lazy" title="Wakeup Cafe"
           />
         </div>
-        <div>
+        <div style={{ minWidth: 0, width: "100%", maxWidth: "100%", boxSizing: "border-box" }}>
           {[
             { Icon: MapPin, label: "Address", val: "I-8 Markaz, Islamabad, Capital Territory" },
             { Icon: Clock,  label: "Hours",   val: "12 PM – 12 AM daily · Fri–Sat until 2 AM" },
             { Icon: Phone,  label: "Phone",   val: "+92 300 000 0000" },
           ].map(({ Icon, label, val }) => (
-            <div key={label} style={{ display: "flex", gap: 12, marginBottom: 18 }}>
+            <div key={label} style={{ display: "flex", gap: 12, marginBottom: 18, minWidth: 0 }}>
               <Icon size={14} style={{ color: R, marginTop: 2, flexShrink: 0 }} />
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <p style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 2, color: MU }}>{label}</p>
-                <p style={{ fontSize: 13, color: TX2 }}>{val}</p>
+                <p style={{ fontSize: 13, color: TX2, wordBreak: "break-word" }}>{val}</p>
               </div>
             </div>
           ))}
           <a href="https://maps.google.com/?q=I-8+Markaz+Islamabad" target="_blank" rel="noopener noreferrer" style={{
-            display: "inline-flex", alignItems: "center", gap: 8,
-            padding: "10px 22px", background: R, color: "#fff",
-            fontFamily: "'Bebas Neue',sans-serif", fontSize: 14,
-            letterSpacing: "0.15em", textDecoration: "none",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            padding: "12px 18px", background: R, color: "#fff",
+            fontFamily: "'Bebas Neue',sans-serif", fontSize: narrow ? 12 : 14,
+            letterSpacing: "0.12em", textDecoration: "none",
+            width: narrow ? "100%" : "inline-flex", maxWidth: "100%", boxSizing: "border-box",
           }}>
             GET DIRECTIONS →
           </a>
