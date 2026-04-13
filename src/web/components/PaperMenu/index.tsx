@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MapPin, Clock, Phone, ExternalLink, ShoppingCart, Plus, ChevronDown, Menu, X } from "lucide-react";
 
@@ -87,25 +87,18 @@ const EVENTS = [
   { date: "FRI 25 APR", title: "Live Jazz",         desc: "Smooth jazz, late-night fries, neon lights." },
 ];
 
-/** Permalinks — previews use Instagram’s /embed iframe (real post media). */
-const INSTAGRAM = [
-  "https://www.instagram.com/reel/DOOSbMwAkvn/",
-  "https://www.instagram.com/p/DQreEMEAoyt/",
-  "https://www.instagram.com/reel/DRIESq5DVdl/",
-  "https://www.instagram.com/reel/DVUT1wXgpA_/",
-  "https://www.instagram.com/reel/DTOQpVgiBve/",
-  "https://www.instagram.com/reel/DUsKQnJDVvT/",
-] as const;
-
-const IG_EMBED_W = 326;
-const IG_EMBED_H = 540;
-/** Extra shrink inside each tile (never upscale past native embed size). */
-const IG_EMBED_SHRINK = 0.58;
-
-function instagramEmbedSrc(permalink: string): string {
-  const clean = permalink.split("?")[0].replace(/\/$/, "");
-  return `${clean}/embed`;
-}
+/**
+ * Grid tiles: static image (cover) → opens post on Instagram.
+ * Swap `image` paths for your own square crops in /public/ to match each post exactly.
+ */
+const INSTAGRAM: { href: string; image: string }[] = [
+  { href: "https://www.instagram.com/reel/DOOSbMwAkvn/", image: "/social-1.png" },
+  { href: "https://www.instagram.com/p/DQreEMEAoyt/", image: "/social-2.png" },
+  { href: "https://www.instagram.com/reel/DRIESq5DVdl/", image: "/social-3.png" },
+  { href: "https://www.instagram.com/reel/DVUT1wXgpA_/", image: "/social-4.png" },
+  { href: "https://www.instagram.com/reel/DTOQpVgiBve/", image: "/social-5.png" },
+  { href: "https://www.instagram.com/reel/DUsKQnJDVvT/", image: "/social-6.png" },
+];
 
 const CHECKER = `repeating-conic-gradient(${CB1} 0% 25%, ${CB2} 0% 50%)`;
 
@@ -370,8 +363,11 @@ function StickyNav({ totalItems, onCartOpen }: { totalItems: number; onCartOpen:
   const cartBorder = totalItems > 0 ? R : scrolled ? "#999" : "rgba(255,255,255,0.7)";
   const headerBarH = scrolled ? 56 : 50;
 
-  const drawerBg = scrolled ? "rgba(255,255,255,0.97)" : "rgba(8,8,8,0.94)";
-  const drawerBorder = scrolled ? `1px solid ${DV}` : "1px solid rgba(255,255,255,0.14)";
+  /* Translucent panel: gradient + solid base (blur stacks on top; base stops “empty” glass on mobile). */
+  const drawerBg = scrolled
+    ? "linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(250,248,245,0.92) 100%), rgb(252,250,248)"
+    : "linear-gradient(180deg, rgba(28,28,30,0.92) 0%, rgba(14,14,16,0.94) 100%), rgb(18,18,20)";
+  const drawerBorder = scrolled ? `1px solid ${DV}` : "1px solid rgba(255,255,255,0.18)";
   const drawerLinkColor = scrolled ? TX : "rgba(255,255,255,0.92)";
   const drawerDivider = scrolled ? DV : "rgba(255,255,255,0.12)";
   const drawerMuted = scrolled ? MU : "rgba(255,255,255,0.45)";
@@ -514,8 +510,8 @@ function StickyNav({ totalItems, onCartOpen }: { totalItems: number; onCartOpen:
               width: "min(92vw, 300px)",
               zIndex: 103,
               background: drawerBg,
-              backdropFilter: "blur(18px)",
-              WebkitBackdropFilter: "blur(18px)",
+              backdropFilter: "blur(14px) saturate(1.15)",
+              WebkitBackdropFilter: "blur(14px) saturate(1.15)",
               borderLeft: drawerBorder,
               boxShadow: scrolled
                 ? "-12px 0 40px rgba(0,0,0,0.08)"
@@ -987,67 +983,74 @@ function InstagramSection() {
         display: "grid", gridTemplateColumns: gridCols, gap: 8,
         width: "100%", maxWidth: "min(100%, 840px)", margin: "0 auto", minWidth: 0,
       }}>
-        {INSTAGRAM.map((href) => (
-          <InstaCell key={href} href={href} />
+        {INSTAGRAM.map((post) => (
+          <InstaCell key={post.href} href={post.href} image={post.image} />
         ))}
       </div>
     </div>
   );
 }
 
-function InstaCell({ href }: { href: string }) {
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const [cellW, setCellW] = useState(280);
-
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect.width;
-      if (w && w > 0) setCellW(w);
-    });
-    ro.observe(el);
-    setCellW(el.offsetWidth || 280);
-    return () => ro.disconnect();
-  }, []);
-
-  const fitScale = Math.min(cellW / IG_EMBED_W, 1);
-  const scale = fitScale * IG_EMBED_SHRINK;
+function InstaCell({ href, image }: { href: string; image: string }) {
   const [hov, setHov] = useState(false);
 
   return (
-    <div
-      ref={wrapRef}
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
         position: "relative",
+        display: "block",
         width: "100%",
         aspectRatio: "1",
         overflow: "hidden",
         background: "#0a0a0a",
-        boxShadow: hov ? `inset 0 0 0 2px ${R}` : "none",
-        transition: "box-shadow 0.2s",
+        textDecoration: "none",
+        color: "inherit",
+        WebkitTapHighlightColor: "transparent",
       }}
     >
-      <iframe
-        title="Instagram post"
-        src={instagramEmbedSrc(href)}
+      <img
+        src={image}
+        alt=""
         loading="lazy"
-        referrerPolicy="strict-origin-when-cross-origin"
-        allow="clipboard-write; encrypted-media; picture-in-picture; web-share"
+        decoding="async"
         style={{
-          position: "absolute",
-          top: "50%",
-          left: "50%",
-          width: IG_EMBED_W,
-          height: IG_EMBED_H,
-          transform: `translate(-50%, -50%) scale(${scale})`,
-          transformOrigin: "center center",
-          border: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          objectPosition: "center",
+          display: "block",
+          transform: hov ? "scale(1.05)" : "scale(1)",
+          transition: "transform 0.35s ease",
         }}
       />
-    </div>
+      <div style={{
+        position: "absolute", inset: 0,
+        boxShadow: hov ? `inset 0 0 0 2px ${R}` : "none",
+        pointerEvents: "none",
+        transition: "box-shadow 0.2s",
+      }} />
+      <div style={{
+        position: "absolute", inset: 0,
+        background: "linear-gradient(to top, rgba(0,0,0,0.6), transparent 48%)",
+        opacity: hov ? 1 : 0,
+        transition: "opacity 0.25s",
+        pointerEvents: "none",
+        display: "flex", alignItems: "flex-end", justifyContent: "center",
+        padding: "10px 8px",
+      }}>
+        <span style={{
+          fontFamily: "'Bebas Neue',sans-serif", fontSize: 9, letterSpacing: "0.22em",
+          color: "#fff", textAlign: "center",
+        }}>
+          VIEW POST
+        </span>
+      </div>
+    </a>
   );
 }
 
